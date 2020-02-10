@@ -15,33 +15,39 @@ final class Floodgate<State, Event>: FeedbackEventConsumer<Event> {
 
     private let queue = Atomic(QueueState())
     private let reducer: (State, Event) -> State
+    private let eventScheduler: Scheduler
 
-    init(state: State, reducer: @escaping (State, Event) -> State) {
+    init(state: State, reducer: @escaping (State, Event) -> State, scheduler: Scheduler) {
         self.state = state
         self.reducer = reducer
+        self.eventScheduler = scheduler
     }
 
     func bootstrap() {
-        reducerLock.lock()
-        defer { reducerLock.unlock() }
+        eventScheduler.schedule {
+            self.reducerLock.lock()
+            defer { self.reducerLock.unlock() }
 
-        guard !hasStarted else { return }
-        hasStarted = true
+            guard !self.hasStarted else { return }
+            self.hasStarted = true
 
-        changeObserver.send(value: state)
-        drainEvents()
+            self.changeObserver.send(value: self.state)
+            self.drainEvents()
+        }
     }
 
     override func process(_ event: Event, for token: Token) {
-        if reducerLock.try() {
-            // Fast path: No running effect.
-            defer { reducerLock.unlock() }
+        eventScheduler.schedule {
+            if self.reducerLock.try() {
+                // Fast path: No running effect.
+                defer { self.reducerLock.unlock() }
 
-            consume(event)
-            drainEvents()
-        } else {
-            // Slow path: Enqueue the event for the running effect to drain it on behalf of us.
-            enqueue(event, for: token)
+                self.consume(event)
+                self.drainEvents()
+            } else {
+                // Slow path: Enqueue the event for the running effect to drain it on behalf of us.
+                self.enqueue(event, for: token)
+            }
         }
     }
 

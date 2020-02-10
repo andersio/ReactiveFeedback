@@ -36,12 +36,12 @@ public final class FeedbackLoop<State, Event>: PropertyProtocol {
         startImmediately: Bool = true
     ) {
         (lifetime, token) = Lifetime.make()
-        floodgate = Floodgate<Value, Event>(state: initial, reducer: reduce)
+        floodgate = Floodgate<Value, Event>(state: initial, reducer: reduce, scheduler: scheduler)
         lifetime.observeEnded(floodgate.dispose)
 
         for feedback in feedbacks {
             lifetime += feedback
-                .events(floodgate.stateDidChange.producer, scheduler, floodgate)
+                .events(floodgate.stateDidChange.producer, floodgate)
         }
 
         if startImmediately {

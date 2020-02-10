@@ -180,12 +180,11 @@ class SystemTests: XCTestCase {
                         return state + event
                     },
                     feedbacks: [
-                        Feedback { state, scheduler, output in
+                        Feedback { state, output in
                             state
                                 .take(first: 1)
                                 .map(value: "_event")
                                 .on(terminated: { semaphore.signal() })
-                                .observe(on: scheduler)
                                 .enqueue(to: output)
                                 .start()
                         }
